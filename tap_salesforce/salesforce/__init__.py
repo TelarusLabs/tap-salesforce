@@ -220,7 +220,8 @@ class Salesforce():
                  select_fields_by_default=None,
                  default_start_date=None,
                  api_type=None,
-                 lookback_window=None):
+                 lookback_window=None,
+                 stream_filters=None):
         self.api_type = api_type.upper() if api_type else None
         self.refresh_token = refresh_token
         self.token = token
@@ -246,6 +247,7 @@ class Salesforce():
         self.data_url = "{}/services/data/v{}.0/{}"
         self.pk_chunking = False
         self.lookback_window = lookback_window
+        self.stream_filters = stream_filters
 
         # validate start_date
         singer_utils.strptime_to_utc(default_start_date)
@@ -331,19 +333,20 @@ class Salesforce():
 
     def login(self):
         if self.is_sandbox:
-            login_url = 'https://test.salesforce.com/services/oauth2/token'
+            login_url = 'https://telarus--fullstagin.sandbox.my.salesforce.com/services/oauth2/token'
         else:
             login_url = 'https://login.salesforce.com/services/oauth2/token'
 
-        login_body = {'grant_type': 'refresh_token', 'client_id': self.sf_client_id,
-                      'client_secret': self.sf_client_secret, 'refresh_token': self.refresh_token}
+#        login_body = {'grant_type': 'refresh_token', 'client_id': self.sf_client_id,
+#                      'client_secret': self.sf_client_secret, 'refresh_token': self.refresh_token}
 
+        login_body = {'grant_type': 'client_credentials', 'client_id': self.sf_client_id, 'client_secret': self.sf_client_secret}
         LOGGER.info("Attempting login via OAuth2")
 
         resp = None
         try:
             resp = self._make_request("POST", login_url, body=login_body, headers={"Content-Type": "application/x-www-form-urlencoded"})
-
+#            resp = self._make_request("POST", login_url, body=login_body, headers={})
             LOGGER.info("OAuth2 login successful")
 
             auth = resp.json()
@@ -427,12 +430,21 @@ class Salesforce():
             else:
                 end_date_clause = ""
 
+            # Add stream filter if defined
+            stream_filter_clause = ""
+            if self.stream_filters and catalog_entry['stream'] in self.stream_filters:
+                stream_filter_clause = " AND ({})".format(self.stream_filters[catalog_entry['stream']])
+
             order_by = " ORDER BY {} ASC".format(replication_key)
             if order_by_clause:
-                return query + where_clause + end_date_clause + order_by
+                return query + where_clause + end_date_clause + stream_filter_clause + order_by
 
-            return query + where_clause + end_date_clause
+            return query + where_clause + end_date_clause + stream_filter_clause
         else:
+            # Handle case where there's no replication key but stream filter is defined
+            if self.stream_filters and catalog_entry['stream'] in self.stream_filters:
+                where_clause = " WHERE {}".format(self.stream_filters[catalog_entry['stream']])
+                return query + where_clause
             return query
 
     def query(self, catalog_entry, state):
