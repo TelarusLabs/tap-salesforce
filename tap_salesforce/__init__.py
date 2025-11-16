@@ -511,7 +511,7 @@ def main_impl():
         if args.discover:
             do_discover(sf)
         elif args.catalog:
-            catalog = args.catalog
+            catalog = args.catalog.to_dict()  # TODO: The singer specification wants us to use the catalog class not the dict variation, but currently this implementation expects everything to be a dict.
             state = build_state(args.state, catalog)
             do_sync(sf, catalog, state)
         elif args.properties:
