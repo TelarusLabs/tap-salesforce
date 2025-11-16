@@ -510,8 +510,13 @@ def main_impl():
 
         if args.discover:
             do_discover(sf)
+        elif args.catalog:
+            catalog = args.catalog
+            state = build_state(args.state, catalog)
+            do_sync(sf, catalog, state)
         elif args.properties:
-            catalog = args.catalog or args.properties
+            LOGGER.info("The --properties flag is deprecated, use --catalog instead")
+            catalog = args.properties
             state = build_state(args.state, catalog)
             do_sync(sf, catalog, state)
     finally:
