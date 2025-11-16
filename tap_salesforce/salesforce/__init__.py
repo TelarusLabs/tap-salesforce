@@ -8,6 +8,7 @@ from requests.exceptions import RequestException
 import singer
 import singer.utils as singer_utils
 from singer import metadata, metrics
+from enum import Enum
 
 from tap_salesforce.salesforce.bulk import Bulk
 from tap_salesforce.salesforce.rest import Rest, API_VERSION
@@ -207,6 +208,11 @@ def field_to_property_schema(field, mdata): # pylint:disable=too-many-branches
 
     return property_schema, mdata
 
+
+class LoginGrantType(Enum):
+    REFRESH_TOKEN = "refresh_token"
+    CLIENT_CREDENTIALS = "client_credentials"
+
 class Salesforce():
     # pylint: disable=too-many-instance-attributes,too-many-arguments,too-many-positional-arguments
     def __init__(self,
@@ -221,7 +227,8 @@ class Salesforce():
                  default_start_date=None,
                  api_type=None,
                  lookback_window=None,
-                 stream_filters=None):
+                 stream_filters=None,
+                 login_grant_type=None):
         self.api_type = api_type.upper() if api_type else None
         self.refresh_token = refresh_token
         self.token = token
@@ -248,6 +255,7 @@ class Salesforce():
         self.pk_chunking = False
         self.lookback_window = lookback_window
         self.stream_filters = stream_filters
+        self.login_grant_type = login_grant_type
 
         # validate start_date
         singer_utils.strptime_to_utc(default_start_date)
@@ -337,16 +345,13 @@ class Salesforce():
         else:
             login_url = 'https://login.salesforce.com/services/oauth2/token'
 
-#        login_body = {'grant_type': 'refresh_token', 'client_id': self.sf_client_id,
-#                      'client_secret': self.sf_client_secret, 'refresh_token': self.refresh_token}
+        login_body = self._build_login_body()
 
-        login_body = {'grant_type': 'client_credentials', 'client_id': self.sf_client_id, 'client_secret': self.sf_client_secret}
         LOGGER.info("Attempting login via OAuth2")
 
         resp = None
         try:
             resp = self._make_request("POST", login_url, body=login_body, headers={"Content-Type": "application/x-www-form-urlencoded"})
-#            resp = self._make_request("POST", login_url, body=login_body, headers={})
             LOGGER.info("OAuth2 login successful")
 
             auth = resp.json()
@@ -384,6 +389,16 @@ class Salesforce():
             resp = self._make_request('GET', url, headers=headers)
 
         return resp.json()
+
+    def _build_login_body(self) -> dict:
+        body = {
+            'grant_type': self.login_grant_type,
+            'client_id': self.sf_client_id,
+            'client_secret': self.sf_client_secret
+        }
+        if self.login_grant_type == LoginGrantType.REFRESH_TOKEN:
+            body['refresh_token'] = self.refresh_token
+        return body
 
     def _get_selected_properties(self, catalog_entry):
         mdata = metadata.to_map(catalog_entry['metadata'])
