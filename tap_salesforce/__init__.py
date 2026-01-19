@@ -493,13 +493,10 @@ def parse_filters():
             stream_filters_idx = idx
             break  # Found it, can exit loop
     
-    print("STREAM FILTER INDEX: ", stream_filters_idx)
     
     if stream_filters_idx is not None:  # Changed from 'if stream_filters_idx:' to handle index 0
         stream_filters_value = sys.argv[stream_filters_idx + 1]
-        print('SYS.ARGV BEFORE: ', sys.argv)
         sys.argv = sys.argv[:stream_filters_idx] + sys.argv[stream_filters_idx + 2:]
-        print("SYS.ARGV.AFTER", sys.argv)
         
         # Check if it's a file path or JSON string
         filter_path = Path(stream_filters_value)
@@ -515,11 +512,11 @@ def parse_filters():
 def main_impl():
     stream_filters = parse_filters()
     args = singer_utils.parse_args(REQUIRED_CONFIG_KEYS)
-    print(sys.argv[1:])
 
     CONFIG.update(args.config)
     if (stream_filters):
         CONFIG.update({'stream_filters': stream_filters})
+
     sf = None
     try:
         # get lookback window from config
