@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import json
+import argparse
 import sys
+from pathlib import Path
 import singer
 import singer.utils as singer_utils
 from singer import metadata, metrics
@@ -482,10 +484,42 @@ def do_sync(sf, catalog, state):
     LOGGER.info("Finished sync")
 
 
+def parse_filters():
+    stream_filters_idx = None
+    stream_filters = None
+    
+    for idx, arg in enumerate(sys.argv):
+        if arg == '--stream-filters':
+            stream_filters_idx = idx
+            break  # Found it, can exit loop
+    
+    print("STREAM FILTER INDEX: ", stream_filters_idx)
+    
+    if stream_filters_idx is not None:  # Changed from 'if stream_filters_idx:' to handle index 0
+        stream_filters_value = sys.argv[stream_filters_idx + 1]
+        print('SYS.ARGV BEFORE: ', sys.argv)
+        sys.argv = sys.argv[:stream_filters_idx] + sys.argv[stream_filters_idx + 2:]
+        print("SYS.ARGV.AFTER", sys.argv)
+        
+        # Check if it's a file path or JSON string
+        filter_path = Path(stream_filters_value)
+        if filter_path.exists() and filter_path.is_file():
+            # It's a file path, load JSON from file
+            with open(filter_path, 'r') as f:
+                stream_filters = json.load(f)
+        else:
+            # It's a JSON string, parse it directly
+            stream_filters = json.loads(stream_filters_value)
+    
+    return stream_filters
 def main_impl():
+    stream_filters = parse_filters()
     args = singer_utils.parse_args(REQUIRED_CONFIG_KEYS)
-    CONFIG.update(args.config)
+    print(sys.argv[1:])
 
+    CONFIG.update(args.config)
+    if (stream_filters):
+        CONFIG.update({'stream_filters': stream_filters})
     sf = None
     try:
         # get lookback window from config
