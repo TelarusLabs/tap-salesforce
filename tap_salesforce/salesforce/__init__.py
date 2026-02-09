@@ -393,7 +393,7 @@ class Salesforce:
         if self.is_sandbox:
             login_url = "https://telarus--fullstagin.sandbox.my.salesforce.com/services/oauth2/token"
         else:
-            login_url = "https://login.salesforce.com/services/oauth2/token"
+            login_url = "https://telarus.my.salesforce.com/services/oauth2/token"
 
         login_body = self._build_login_body()
 
